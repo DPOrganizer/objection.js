@@ -142,10 +142,63 @@ class TestSession {
               },
               to: 'Model1.id'
             }
-          }
+          },
+
+					model2Relation3: {
+						relation: Model.ManyToManyRelation,
+						modelClass: Model3,
+						join: {
+              from: 'model2.id_col',
+              through: {
+                from: 'Model2Model3.model2Id',
+                to: 'Model2Model3.model3Id'
+              },
+              to: 'model3.id'
+            }
+					}
         };
       }
     }
+
+		class Model3 extends Model {
+
+			static tableName() {
+				return 'model3';
+			}
+
+			static get idColumn() {
+        return 'id';
+      }
+
+			static get relationMappings() {
+				return {
+					model3Relation1: {
+						relation: Model.ManyToManyRelation,
+						modelClass: Model4,
+						join: {
+							from: 'model3.id',
+							through: {
+								from: 'Model3Model4.model3Id',
+								to: 'Model3Model4.model4Id'
+							},
+							to: 'model4.id'
+						},
+					},
+				};
+			}
+		}
+
+		class Model4 extends Model {
+
+			static tableName() {
+				return 'model4';
+			}
+
+			static get idColumn() {
+        return 'id';
+      }
+
+		}
 
     [
       ['$beforeInsert', 1],
@@ -157,12 +210,16 @@ class TestSession {
       ['$afterGet', 1]
     ].forEach(hook => {
       Model1.prototype[hook[0]] = createHook(hook[0], hook[1], hook[2]);
-      Model2.prototype[hook[0]] = createHook(hook[0], hook[1], hook[2]);
+			Model2.prototype[hook[0]] = createHook(hook[0], hook[1], hook[2]);
+			Model3.prototype[hook[0]] = createHook(hook[0], hook[1], hook[2]);
+      Model4.prototype[hook[0]] = createHook(hook[0], hook[1], hook[2]);
     });
 
     return {
       Model1: Model1,
-      Model2: Model2
+      Model2: Model2,
+			Model3: Model3,
+			Model4: Model4,
     };
   }
 
@@ -173,8 +230,12 @@ class TestSession {
     return Promise.resolve()
       .then(() => knex.schema.dropTableIfExists('Model1Model2'))
       .then(() => knex.schema.dropTableIfExists('Model1Model2One'))
-      .then(() => knex.schema.dropTableIfExists('Model1'))
+			.then(() => knex.schema.dropTableIfExists('Model1'))
       .then(() => knex.schema.dropTableIfExists('model2'))
+			.then(() => knex.schema.dropTableIfExists('model3'))
+      .then(() => knex.schema.dropTableIfExists('model4'))
+			.then(() => knex.schema.dropTableIfExists('Model2Model3'))
+			.then(() => knex.schema.dropTableIfExists('Model3Model4'))
       .then(() => {
         return knex.schema
           .createTable('Model1', table => {
@@ -189,6 +250,16 @@ class TestSession {
             table.string('model2_prop1');
             table.integer('model2_prop2');
           })
+					.createTable('model3', table => {
+						table.increments('id').primary();
+						table.string('model3Prop1');
+						table.integer('model3Prop2');
+					})
+					.createTable('model4', table => {
+						table.increments('id').primary();
+						table.string('model4Prop1');
+						table.integer('model4Prop2');
+					})
           .createTable('Model1Model2', table => {
             table.increments('id').primary();
             table.string('extra1');
@@ -200,7 +271,15 @@ class TestSession {
           .createTable('Model1Model2One', table => {
             table.integer('model1Id').unsigned().notNullable().references('id').inTable('Model1').onDelete('CASCADE').index();
             table.integer('model2Id').unsigned().notNullable().references('id_col').inTable('model2').onDelete('CASCADE').index();
-          });
+          })
+					.createTable('Model2Model3', table => {
+						table.integer('model2Id').unsigned().notNullable().references('id_col').inTable('model2').onDelete('CASCADE').index();
+            table.integer('model3Id').unsigned().notNullable().references('id').inTable('model3').onDelete('CASCADE').index();
+					})
+					.createTable('Model3Model4', table => {
+						table.integer('model3Id').unsigned().notNullable().references('id').inTable('Model3').onDelete('CASCADE').index();
+            table.integer('model4Id').unsigned().notNullable().references('id').inTable('model4').onDelete('CASCADE').index();
+					});
       })
       .catch(() => {
         throw new Error('Could not connect to '
@@ -216,12 +295,16 @@ class TestSession {
     return transaction(this.knex, (trx) => {
       return trx('Model1Model2')
         .delete()
-        .then(() => trx('Model1Model2One').delete())
+				.then(() => trx('Model1Model2One').delete())
+				.then(() => trx('Model2Model3').delete())
+        .then(() => trx('Model3Model4').delete())
         .then(() => trx('Model1').delete())
         .then(() => trx('model2').delete())
+				.then(() => trx('model3').delete())
+				.then(() => trx('model4').delete())
         .then(() => this.models.Model1.query(trx).insertGraph(data))
         .then(() => {
-          return Promise.resolve(['Model1', 'model2', 'Model1Model2']).map(table => {
+          return Promise.resolve(['Model1', 'model2', 'model3', 'model4', 'Model1Model2']).map(table => {
             const idCol = (_.find(this.models, it => it.getTableName() === table) || {getIdColumn: () => 'id'}).getIdColumn();
 
             return trx(table).max(idCol).then(res => {

@@ -124,6 +124,21 @@ module.exports = session => {
             // This is the new row.
             model2Prop1: 'inserted hasMany'
           }
+        ],
+
+        model1Relation3: [
+          {
+            model2Relation3: [
+              {
+                model3Prop1: 'child2',
+                model3Relation1: [
+                  {
+                    model4Prop1: 'child3'
+                  }
+                ]
+              }
+            ]
+          }
         ]
       };
 
@@ -138,7 +153,11 @@ module.exports = session => {
 
         return (
           Model1.query(trx)
-            .upsertGraph(upsert)
+            .upsertGraph(upsert, {
+              insertMissing: true,
+              relate: true,
+              unrelate: true
+            })
             // Sort all result by id to make the SQL we test below consistent.
             .mergeContext({
               onBuild(builder) {
