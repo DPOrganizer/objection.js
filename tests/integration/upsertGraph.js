@@ -1733,41 +1733,6 @@ module.exports = session => {
         });
     });
 
-    // #782 fix
-    it('should insert root model with nested relations', () => {
-      const upsert = {
-        id: 1,
-        model1Relation3: [
-          {
-            id: 4,
-            model2Relation3: [
-              {
-                id: 2,
-                model3Prop1: 'child2',
-                model3Relation1: [
-                  {
-                    id: 5,
-                    model4Prop1: 'child3'
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      };
-
-      return Model1.query(session.knex)
-        .upsertGraph(upsert, { unrelate: true, relate: true })
-        .then(result => {
-          // Fetch the graph from the database.
-          console.log(result);
-          return false;
-        })
-        .catch(err => {
-          console.log(err);
-        });
-    });
-
     it('raw sql and subqueries should work', () => {
       const upsert = {
         // the root gets updated because it has an id
