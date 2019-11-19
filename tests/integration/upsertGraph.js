@@ -2894,6 +2894,49 @@ module.exports = session => {
               });
           });
         });
+
+        it.only('should upsert recursively, relate and solve references', () => {
+          const model2RefId = 'model2RefId';
+          const upsert = {
+            model1Prop1: 'root new',
+            model1Relation2: {
+              '#id': model2RefId,
+              model2Prop1: 'child new'
+            },
+            model1Relation3: [
+              {
+                idCol: 1,
+                model2Prop1: 'updated model2Prop1',
+                model2Relation2: {
+                  model1Relation3: [
+                    {
+                      '#ref': model2RefId
+                    }
+                  ]
+                }
+              }
+            ]
+          };
+
+          return transaction(session.knex, trx => {
+            return Model1.query(trx)
+              .upsertGraph(upsert, { relate: true, unrelate: true, fetchStrategy })
+              .then(result => {
+                console.log('upsertGraph result', JSON.stringify(result, null, 2));
+                return Model1.query(trx)
+                  .findById(result.id)
+                  .eager(
+                    '[model1Relation2,model1Relation3(orderById).[model2Relation2(orderById).model1Relation3(orderById)]]'
+                  );
+              })
+              .then(result => {
+                console.log('findById result', JSON.stringify(result, null, 2));
+                expect(result.model1Relation2.idCol).tos.eql(
+                  result.model1Relation3[0].model2Relation2.model1Relation3[0].idCol
+                );
+              });
+          });
+        });
       });
 
       describe('validation and transactions', () => {
